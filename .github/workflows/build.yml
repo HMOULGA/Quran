@@ -27,15 +27,21 @@ jobs:
         with: { node-version: 22, cache: npm }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
-      - uses: android-actions/setup-android@v3
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - run: npx cap sync android
+      - name: Generer le projet Android
+        run: |
+          rm -rf android
+          npx cap add android
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />#' android/app/src/main/AndroidManifest.xml
+          grep -c RECORD_AUDIO android/app/src/main/AndroidManifest.xml
+          npx capacitor-assets generate --android --iconBackgroundColor '#0f4c3a' --splashBackgroundColor '#f7f3ea'
+          npx cap sync android
       - name: Gradle assembleDebug
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace
       - run: mv android/app/build/outputs/apk/debug/app-debug.apk Itqan-android.apk
       - uses: actions/upload-artifact@v4
         with:
