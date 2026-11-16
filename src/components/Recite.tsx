@@ -29,9 +29,23 @@ export function ReciteView({ surah, verses, startVerse }: { surah: number; verse
   const [saved, setSaved] = useState(false)
   const [devText, setDevText] = useState('')
   const rec = useRef<Recognizer | null>(null)
+  const pendingText = useRef<string | null>(null)
+  const throttle = useRef<number | null>(null)
+  const lastVerse = useRef(0)
+
+  // La reconnaissance en direct envoie des dizaines de résultats partiels par seconde :
+  // on ne réaligne qu'au plus toutes les 250 ms.
+  const pushTranscript = (t: string) => {
+    pendingText.current = t
+    if (throttle.current != null) return
+    throttle.current = window.setTimeout(() => {
+      throttle.current = null
+      if (pendingText.current != null) setTranscript(pendingText.current)
+    }, 250)
+  }
 
   const slice = useMemo(() => verses.filter((v) => v.n >= start), [verses, start])
-  const expected = useMemo(() => buildExpected(slice), [slice])
+  const expected = useMemo(() => buildExpected(slice, surah), [slice, surah])
   const deferred = useDeferredValue(transcript)
 
   const result = useMemo(() => {
@@ -47,15 +61,20 @@ export function ReciteView({ surah, verses, startVerse }: { surah: number; verse
   const listening = state === 'listening' || state === 'processing'
 
   // Suivre la position de lecture à l'écran
+  // Défilement uniquement quand on change de verset (et non à chaque mot)
   useEffect(() => {
     if (!listening || result.position === 0) return
     const w = expected[Math.min(result.position, expected.length - 1)]
+    if (w.verse === lastVerse.current) return
+    lastVerse.current = w.verse
     document.getElementById(`v${w.verse}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [result.position, listening, expected])
 
   useEffect(() => () => void rec.current?.stop(), [])
 
   const reset = () => {
+    pendingText.current = null
+    lastVerse.current = 0
     setTranscript('')
     setFinished(false)
     setSaved(false)
@@ -68,7 +87,7 @@ export function ReciteView({ surah, verses, startVerse }: { surah: number; verse
     rec.current = createRecognizer(
       engine,
       {
-        onTranscript: setTranscript,
+        onTranscript: pushTranscript,
         onState: (s, m) => {
           setState(s)
           if (m) setMessage(m)
@@ -84,6 +103,9 @@ export function ReciteView({ surah, verses, startVerse }: { surah: number; verse
   const stopRec = async () => {
     await rec.current?.stop()
     rec.current = null
+    if (throttle.current != null) clearTimeout(throttle.current)
+    throttle.current = null
+    if (pendingText.current != null) setTranscript(pendingText.current)
     setFinished(true)
   }
 

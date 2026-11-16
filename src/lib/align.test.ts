@@ -43,8 +43,15 @@ describe('alignement', () => {
   })
 
   it('détecte un mot remplacé', () => {
-    const r = align(E, heardWords('بسم الله الرحمن الرحيم الحمد لله رب السماوات'))
+    const r = align(E, heardWords('بسم الله الرحمن الرحيم الحمد لله رب السماوات الرحمن الرحيم'))
     expect(['wrong', 'close']).toContain(r.status[7])
+    expect(r.status[8]).toBe('ok')
+  })
+
+  it('n’avance pas sur un mot inconnu en fin de récitation', () => {
+    const r = align(E, heardWords('بسم الله الرحمن الرحيم الحمد لله رب كتاب'))
+    expect(r.position).toBe(7)
+    expect(r.status[7]).toBe('pending')
   })
 
   it('ignore l’isti‘adha prononcée avant', () => {
@@ -62,5 +69,39 @@ describe('alignement', () => {
     const E3 = buildExpected([{ n: 3, ar: 'ٱلَّذِينَ يُؤۡمِنُونَ بِٱلۡغَيۡبِ وَيُقِيمُونَ ٱلصَّلَوٰةَ' }])
     const r = align(E3, heardWords('الذين يؤمنون بالغيب ويقيمون الصلاة'))
     expect(r.status.every((s) => s === 'ok')).toBe(true)
+  })
+})
+
+describe('lettres isolées', () => {
+  const baqara = [
+    { n: 1, ar: 'الٓمٓ' },
+    { n: 2, ar: 'ذَٰلِكَ ٱلۡكِتَٰبُ لَا رَيۡبَۛ فِيهِۛ هُدٗى لِّلۡمُتَّقِينَ' },
+  ]
+  const B = buildExpected(baqara, 2)
+
+  it('reconnaît « alif lām mīm » sans dévoiler la suite', () => {
+    const r = align(B, heardWords('الف لام ميم'))
+    expect(r.status[0]).toBe('ok')
+    expect(r.position).toBe(1)
+    expect(r.status.slice(1).every((s) => s === 'pending')).toBe(true)
+  })
+
+  it('accepte aussi la graphie avec hamza finale', () => {
+    const Y = buildExpected([{ n: 1, ar: 'يسٓ' }, { n: 2, ar: 'وَٱلۡقُرۡءَانِ ٱلۡحَكِيمِ' }], 36)
+    const r = align(Y, heardWords('ياء سين والقرآن الحكيم'))
+    expect(r.status).toEqual(['ok', 'ok', 'ok'])
+  })
+
+  it('reste rapide sur une longue récitation', async () => {
+    const { readFileSync } = await import('node:fs')
+    const verses = JSON.parse(readFileSync('public/data/s/2.json', 'utf8'))
+    const X = buildExpected(verses, 2)
+    const words = X.slice(1, 301).map((w) => w.variants[0])
+    const t0 = performance.now()
+    for (let k = 20; k <= 300; k += 20) align(X.slice(0, Math.min(X.length, Math.ceil(k * 1.3) + 80)), words.slice(0, k))
+    const r = align(X.slice(0, 470), words)
+    const ms = performance.now() - t0
+    expect(r.position).toBe(301)
+    expect(ms).toBeLessThan(1500)
   })
 })

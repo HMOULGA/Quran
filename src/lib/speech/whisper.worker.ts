@@ -18,27 +18,33 @@ async function hasWebGPU(): Promise<{ ok: boolean; f16: boolean }> {
   }
 }
 
+// Les exports fp16 du modèle Coran échouent avec ONNX Runtime (erreur de type float16/float).
+// On essaie donc plusieurs configurations, de la plus rapide à la plus sûre.
+type Dtype = 'q4' | 'q8' | 'fp32'
 async function load(model: string) {
   const gpu = await hasWebGPU()
+  const attempts: { device: 'webgpu' | 'wasm'; dtype: Dtype }[] = [
+    ...(gpu.ok ? [{ device: 'webgpu' as const, dtype: 'q4' as const }] : []),
+    { device: 'wasm', dtype: 'q8' },
+    { device: 'wasm', dtype: 'fp32' },
+  ]
   const progress_callback = (p: { status: string; file?: string; progress?: number }) =>
     postMessage({ type: 'progress', status: p.status, file: p.file, progress: p.progress })
-  try {
-    if (gpu.ok) {
+  const errors: string[] = []
+  for (const a of attempts) {
+    try {
       asr = (await pipeline('automatic-speech-recognition', model, {
-        device: 'webgpu',
-        dtype: gpu.f16 ? 'fp16' : 'q4',
+        device: a.device,
+        dtype: { encoder_model: a.dtype, decoder_model_merged: a.dtype },
         progress_callback,
       })) as AutomaticSpeechRecognitionPipeline
+      postMessage({ type: 'backend', label: `${a.device} ${a.dtype}` })
       return
+    } catch (e) {
+      errors.push(`${a.device}/${a.dtype} : ${String((e as Error)?.message ?? e).slice(0, 160)}`)
     }
-  } catch {
-    /* repli sur WebAssembly */
   }
-  asr = (await pipeline('automatic-speech-recognition', model, {
-    device: 'wasm',
-    dtype: 'q8',
-    progress_callback,
-  })) as AutomaticSpeechRecognitionPipeline
+  throw new Error(errors.join(' | '))
 }
 
 self.onmessage = async (e: MessageEvent) => {
