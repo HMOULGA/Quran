@@ -82,5 +82,3 @@ android/                   projet Android (Capacitor)
 - Audio : [EveryAyah.com](https://everyayah.com)
 - Police : Amiri Quran (SIL OFL)
 - Modèle : `tarteel-ai/whisper-base-ar-quran` (Apache 2.0)
-
-Avant une publication sur le Play Store, vérifiez les conditions d'utilisation de chaque source et faites relire le texte affiché par une personne qualifiée.
