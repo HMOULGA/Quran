@@ -7,7 +7,7 @@
     "data": "node scripts/build-data.mjs",
     "dev": "vite",
     "build": "node scripts/build-data.mjs && tsc -b && vite build",
-    "test": "vitest run",
+    "test": "node scripts/build-data.mjs && vitest run",
     "lint": "oxlint src",
     "preview": "vite preview",
     "electron": "electron .",

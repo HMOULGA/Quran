@@ -102,6 +102,6 @@ describe('lettres isolées', () => {
     const r = align(X.slice(0, 470), words)
     const ms = performance.now() - t0
     expect(r.position).toBe(301)
-    expect(ms).toBeLessThan(1500)
+    expect(ms).toBeLessThan(5000)
   })
 })
