@@ -48,6 +48,7 @@ export function createWebSpeechRecognizer(cb: RecognizerCallbacks): Recognizer {
       done = ''
       active = true
       begin()
+      cb.onInfo?.('Reconnaissance du navigateur')
       cb.onState('listening')
     },
     async stop() {

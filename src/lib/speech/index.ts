@@ -15,6 +15,12 @@ export interface RecognizerCallbacks {
   onTranscript(text: string): void
   onState(state: RecState, message?: string): void
   onProgress?(percent: number, label: string): void
+  /** Problème non bloquant : la récitation continue. */
+  onWarning?(message: string): void
+  /** Information sur le moteur utilisé (ex. « WebGPU q4 »). */
+  onInfo?(label: string): void
+  /** Niveau du micro entre 0 et 1, pour l'indicateur visuel. */
+  onLevel?(level: number): void
 }
 
 export interface Recognizer {

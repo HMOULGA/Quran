@@ -28,6 +28,9 @@ export function ReciteView({ surah, verses, startVerse }: { surah: number; verse
   const [finished, setFinished] = useState(false)
   const [saved, setSaved] = useState(false)
   const [devText, setDevText] = useState('')
+  const [warning, setWarning] = useState('')
+  const [info, setInfo] = useState('')
+  const [level, setLevel] = useState(0)
   const rec = useRef<Recognizer | null>(null)
   const pendingText = useRef<string | null>(null)
   const throttle = useRef<number | null>(null)
@@ -79,6 +82,7 @@ export function ReciteView({ surah, verses, startVerse }: { surah: number; verse
     setFinished(false)
     setSaved(false)
     setMessage('')
+    setWarning('')
   }
 
   const startRec = async () => {
@@ -94,6 +98,9 @@ export function ReciteView({ surah, verses, startVerse }: { surah: number; verse
           if (s !== 'loading') setProgress(null)
         },
         onProgress: (p) => setProgress(p),
+        onWarning: setWarning,
+        onInfo: setInfo,
+        onLevel: setLevel,
       },
       settings.whisperModel,
     )
@@ -212,6 +219,12 @@ export function ReciteView({ surah, verses, startVerse }: { surah: number; verse
         )}
         {finished && summary.total === 0 && <p className="muted small">Aucune récitation détectée. Réessayez plus près du micro.</p>}
         {state === 'error' && <p className="error">{message}</p>}
+        {warning && state !== 'error' && <p className="warning small">{warning}</p>}
+        {(listening || finished) && transcript && (
+          <p className="heard small" dir="rtl" lang="ar" title="Ce que la reconnaissance a entendu">
+            <span className="muted" dir="ltr">Entendu :</span> {transcript.split(/\s+/).slice(-14).join(' ')}
+          </p>
+        )}
         {state === 'loading' && (
           <p className="muted small">
             {engine === 'whisper'
@@ -227,6 +240,7 @@ export function ReciteView({ surah, verses, startVerse }: { surah: number; verse
             <span className="st-missed">oublié</span>
           </div>
           <button
+            style={{ ['--lvl' as string]: listening ? level : 0 }}
             className={`mic ${listening ? 'live' : ''}`}
             onClick={listening ? stopRec : startRec}
             disabled={state === 'loading'}
@@ -236,6 +250,7 @@ export function ReciteView({ surah, verses, startVerse }: { surah: number; verse
           </button>
           <div className="panel-state small">
             {listening ? (state === 'processing' ? 'Analyse…' : 'À l’écoute…') : finished ? 'Terminé' : 'Touchez pour réciter'}
+            {info && <div className="engine-info">{info}</div>}
           </div>
         </div>
         {import.meta.env.DEV && (

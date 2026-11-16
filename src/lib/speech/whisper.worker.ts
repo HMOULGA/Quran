@@ -6,6 +6,9 @@ env.allowLocalModels = false
 
 let asr: AutomaticSpeechRecognitionPipeline | null = null
 let loading: Promise<void> | null = null
+let backend = ''
+// Certains exports n'acceptent pas l'option de langue : on la retire si elle provoque une erreur
+let withLanguage = true
 
 async function hasWebGPU(): Promise<{ ok: boolean; f16: boolean }> {
   const gpu = (navigator as unknown as { gpu?: { requestAdapter(): Promise<{ features: Set<string> } | null> } }).gpu
@@ -38,7 +41,7 @@ async function load(model: string) {
         dtype: { encoder_model: a.dtype, decoder_model_merged: a.dtype },
         progress_callback,
       })) as AutomaticSpeechRecognitionPipeline
-      postMessage({ type: 'backend', label: `${a.device} ${a.dtype}` })
+      backend = `${a.device === 'webgpu' ? 'WebGPU' : 'processeur'} ${a.dtype}`
       return
     } catch (e) {
       errors.push(`${a.device}/${a.dtype} : ${String((e as Error)?.message ?? e).slice(0, 160)}`)
@@ -53,10 +56,19 @@ self.onmessage = async (e: MessageEvent) => {
     if (msg.type === 'load') {
       loading ??= load(msg.model)
       await loading
-      postMessage({ type: 'ready' })
+      postMessage({ type: 'ready', backend })
     } else if (msg.type === 'transcribe') {
       if (!asr) throw new Error('Modèle non chargé')
-      const out = await asr(msg.audio as Float32Array, { language: 'arabic', task: 'transcribe' })
+      const audio = msg.audio as Float32Array
+      let out
+      if (withLanguage) {
+        try {
+          out = await asr(audio, { language: 'arabic', task: 'transcribe' })
+        } catch {
+          withLanguage = false
+        }
+      }
+      out ??= await asr(audio)
       const text = Array.isArray(out) ? out.map((o) => o.text).join(' ') : out.text
       postMessage({ type: 'result', id: msg.id, text })
     }
